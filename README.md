@@ -1,6 +1,6 @@
 # CompVec: word embeddings for better compositionality
 
-This repository contains all code that was used to write the paper: "CompVec: A method to tune word embeddings for better compositionality". In the paper we present both an in-depth analysis of various word embeddings (Word2Vec, GloVe and fastText) in terms of their compositionality as well as a method to tune them towards better compositionality. We find that training the embeddings to compose improves the performance of these word embeddings overall.
+This repository contains all code that was used to write the paper: "CompVec: word embeddings for better compositionality". In the paper we present both an in-depth analysis of various word embeddings (Word2Vec, GloVe and fastText) in terms of their compositionality as well as a method to tune them towards better compositionality. We find that training the embeddings to compose improves the performance of these word embeddings overall.
 
 Word embeddings are tuned using a simple neural network architecture with definitions and lemmas from the lexicon. This resulted in better embeddings, not only in terms of their compositionality but overall. Even more importantly, our architecture allows for the embeddings to be composed using simple arithmetic operations, which makes these embeddings specifically suitable for production applications such as web search or data mining.
 
