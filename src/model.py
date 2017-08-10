@@ -90,10 +90,10 @@ class Model:
 
             if self.composition == 'sum':
                 c = tf.reduce_sum(e, axis=1)
-            # elif self.composition == 'prod':
-            #     # TODO: fix masking
-            #     # Problem see: https://github.com/tensorflow/tensorflow/issues/8841
-            #     c = tf.transpose(tf.reduce_prod(e, axis=1))
+            elif self.composition == 'prod':
+                # Problem see: https://github.com/tensorflow/tensorflow/issues/8841
+                e = tf.transpose(e) + (1.0 - tf.cast(tf.transpose(self.x_mask), tf.float32))
+                c = tf.reduce_prod(tf.transpose(e), axis=1)
             elif self.composition == 'max':
                 c = tf.reduce_max(e, axis=1)
             elif self.composition == 'gru':
