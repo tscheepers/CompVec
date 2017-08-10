@@ -4,7 +4,7 @@ This repository contains all code that was used to write the paper: "CompVec: wo
 
 Word embeddings are tuned using a simple neural network architecture with definitions and lemmas from the lexicon. This resulted in better embeddings, not only in terms of their compositionality but overall. Even more importantly, our architecture allows for the embeddings to be composed using simple arithmetic operations, which makes these embeddings specifically suitable for production applications such as web search or data mining.
 
-The model is written using Tensorflow and can compose embeddings using multiple composition functions:
+The model is written using Tensorflow and can compose embeddings using [multiple composition functions](src/model.py#L89):
 
 - Sum (arithmetic composition)
 - Avg/Mean (arithmetic composition)
