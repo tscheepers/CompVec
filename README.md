@@ -1,25 +1,24 @@
-# CompVec: A method to tune word embeddings for better compositionality
+# CompVec: word embeddings for better compositionality
 
-This repository contains all code that was used to write the paper: "CompVec: A method to tune word embeddings for better compositionality". Which uses the compositional structure available in a lexicon to tune word embeddings for better compositionality.
+This repository contains all code that was used to write the paper: "CompVec: word embeddings for better compositionality". In the paper we present both an in-depth analysis of various word embeddings (Word2Vec, GloVe and fastText) in terms of their compositionality as well as a method to tune them towards better compositionality. We find that training the embeddings to compose improves the performance of these word embeddings overall.
 
-The respository contains code to tune word embeddings from three sources: Word2Vec (Google News), GloVe and fastText (Wikipedia).
+Word embeddings are tuned using a simple neural network architecture with definitions and lemmas from the lexicon. This resulted in better embeddings, not only in terms of their compositionality but overall. Even more importantly, our architecture allows for the embeddings to be composed using simple arithmetic operations, which makes these embeddings specifically suitable for production applications such as web search or data mining.
 
-The model is written using Tensorflow and can compose embeddings using multiple methods:
+The model is written using Tensorflow and can compose embeddings using [multiple composition functions](src/model.py#L89):
 
-- Sum (algebraic composition)
-- Avg/Mean (algebraic composition)
-- Prod (algebraic composition)
-- Max (algebraic composition)
+- Sum (arithmetic composition)
+- Avg/Mean (arithmetic composition)
+- Prod (arithmetic composition)
+- Max (arithmetic composition)
 - RNN (learning to compose)
 - GRU (learning to compose)
 
-We train the model on lemma-definition pairs from the WordNet dataset.
+In our analysis, we evaluate original as well as tuned embeddings using existing word similarity and sentence embedding evaluation methods. But aside from these evaluation measures used in related we also evaluate using a novel ranking method which uses a dictionary based dataset of lemmas and definitions from WordNet. Dictionary definitions are inherently compositional and this makes them very suitable for such an evaluation method. In contrast to other evaluation methods, ours is not invariant to the magnitude of the embedding vector—which we show is essential for composition. We consider this new evaluation method to be a key contribution.
 
-We evaluate the model using three collections of methods.
+- [CompVecEval](src/evaluate/nn.py), a ball tree nearest neightbour ranking approach using a held out set from wordnet to deterine the compositional power of the embeddings. This is a method we developed ourselves and is not invariant to the embeddingvector's mangitude. Our method also takes the many-to-many lemma definition relationships in wordnet into account.
+- [SentEval](src/evaluate/senteval.py), sentence evaluation against various tasks and dataset.
+- [WordSim](src/evaluate/wordsim.py), word vector evaluation against various word similairty dataset.
 
-- SentEval, sentence evaluation against various tasks and dataset.
-- WordSim, word vector evaluation against various word similairty dataset
-- CompVec NN, a ball tree nearest neightbour ranking approach using a held out set from wordnet to deterine the compositional power of the embeddings. This is a method we developed ourselves and is not invariant to the embeddingvector's mangitude. Our method also takes the many-to-many lemma definition relationships in wordnet into account.
 
 License (MIT)
 -----
