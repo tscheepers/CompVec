@@ -25,9 +25,10 @@ class Run:
                  embedding_size=300,
                  stop_gradients_y_n=False,
                  dropout_keep_p=0.75,
-                 margin=0.0,
+                 margin=0.25,
                  pretraining=None,
-                 composition='sum'):
+                 composition='sum',
+                 refine_after_x_steps=0):
 
         self.dataset = dataset
         self.embedding_processor = embedding_processor
@@ -36,6 +37,7 @@ class Run:
         self.batch_size = batch_size
         self.dropout_keep_p = dropout_keep_p
         self.pretraining = pretraining
+        self.refine_after_x_steps = refine_after_x_steps
 
         self.run_dir = directory('/out/run-%s' % run_group_name, ['logs', 'tsne', 'embeddings', 'output'])
         self.data_dir = directory('/data/compositional_wordnet')
@@ -67,10 +69,11 @@ class Run:
         """
         Get the run name
         """
-        return '%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-em%d' % (
+        return '%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-em%d-r%d' % (
             self.model.composition, ('random' if self.pretraining is None else self.pretraining),
             self.dropout_keep_p, self.model.margin, int(self.model.stop_gradients_y_n),
             self.learning_rate, self.batch_size, self.dataset.max_definition_length, self.model.embedding_size,
+            self.refine_after_x_steps
         )
 
     # noinspection PyAttributeOutsideInit
@@ -274,7 +277,12 @@ class Run:
 
         # Train step
         x, y_p, y_n = self.dataset.train.next_batch(self.batch_size)
-        feed_dict = self.model.feed_dict(x, y_p, y_n, dropout_keep_p=self.dropout_keep_p)
+
+        feed_dict = self.model.feed_dict(
+            x, y_p, y_n,
+            dropout_keep_p=self.dropout_keep_p,
+            stop_embedding_gradients=(self.model.composition in ['rnn', 'gru'] and self.step < self.refine_after_x_steps)
+        )
 
         # Only execute summary for train every 10 steps to speed up training
         if self.every_x_steps(summary_every_x_steps):

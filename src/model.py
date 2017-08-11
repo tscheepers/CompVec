@@ -41,6 +41,7 @@ class Model:
 
         # To set the dropout paramter
         self.dropout_keep_p = tf.placeholder(tf.float32, name='dropout_keep_p')
+        self.stop_embedding_gradients = tf.placeholder(tf.int32, name='stop_embedding_gradients')
 
         self.embeddings = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0), name='embeddings')
 
@@ -67,9 +68,21 @@ class Model:
             if dropout:
                 e = tf.nn.dropout(e, self.dropout_keep_p)
 
+            e = tf.cond(
+                tf.equal(self.stop_embedding_gradients, tf.constant(1)),
+                lambda: tf.stop_gradient(e),
+                lambda: e
+            )
+
         with tf.variable_scope('y_p_embedding_lookup'):
             # Positive target
             ye_p = tf.nn.embedding_lookup(self.embeddings, self.y_p)
+
+            ye_p = tf.cond(
+                tf.equal(self.stop_embedding_gradients, tf.constant(1)),
+                lambda: tf.stop_gradient(ye_p),
+                lambda: ye_p
+            )
 
         with tf.variable_scope('y_n_embedding_lookup'):
             # Negative target
@@ -78,6 +91,12 @@ class Model:
             # During training we do not want to update the negative targets, so we stop the gradients
             if self.stop_gradients_y_n:
                 ye_n = tf.stop_gradient(ye_n)
+            else:
+                ye_n = tf.cond(
+                    tf.equal(self.stop_embedding_gradients, tf.constant(1)),
+                    lambda: tf.stop_gradient(ye_n),
+                    lambda: ye_n
+                )
 
         return e, ye_p, ye_n
 
@@ -90,10 +109,10 @@ class Model:
 
             if self.composition == 'sum':
                 c = tf.reduce_sum(e, axis=1)
-            # elif self.composition == 'prod':
-            #     # TODO: fix masking
-            #     # Problem see: https://github.com/tensorflow/tensorflow/issues/8841
-            #     c = tf.transpose(tf.reduce_prod(e, axis=1))
+            elif self.composition == 'prod':
+                # Problem see: https://github.com/tensorflow/tensorflow/issues/8841
+                e = tf.transpose(e) + (1.0 - tf.cast(tf.transpose(self.x_mask), tf.float32))
+                c = tf.reduce_prod(tf.transpose(e), axis=1)
             elif self.composition == 'max':
                 c = tf.reduce_max(e, axis=1)
             elif self.composition == 'gru':
@@ -263,7 +282,7 @@ class Model:
 
         return h_retain
 
-    def feed_dict(self, x, y_p=None, y_n=None, dropout_keep_p=1.0):
+    def feed_dict(self, x, y_p=None, y_n=None, dropout_keep_p=1.0, stop_embedding_gradients=False):
         """
         Create feed dictionary for the Tensorflow model
         """
@@ -282,7 +301,8 @@ class Model:
             result = {
                 self.x: x,
                 self.x_mask: mask(x),
-                self.dropout_keep_p: dropout_keep_p
+                self.dropout_keep_p: dropout_keep_p,
+                self.stop_embedding_gradients: 1 if stop_embedding_gradients else 0
             }
 
         if y_p is not None:

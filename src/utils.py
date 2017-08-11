@@ -10,6 +10,24 @@ GLOVE_FILE_NAME = 'glove.840B.300d.txt'
 FASTTEXT_FILE_NAME = 'wiki.en.vec'
 
 
+def store_dataset(d):
+    """Store dataset for use in other applications"""
+    store_dataset_path = directory('/data/compositional_wordnet')
+    d.store_dataset(store_dataset_path)
+
+
+def filter_pretrained(ep):
+    """Filter pretrained embeddings using our vocabulary, and store for future use"""
+    store_dataset_path = directory('/data/compositional_wordnet')
+
+    ep.process_pretrained_embeddings(input_filename=original_embedding_file('word2vec'),
+                                     output_filename=store_dataset_path + '/word2vec.vec.gz')
+    ep.process_pretrained_embeddings(input_filename=original_embedding_file('glove'),
+                                     output_filename=store_dataset_path + '/glove.vec.gz')
+    ep.process_pretrained_embeddings(input_filename=original_embedding_file('fasttext'),
+                                     output_filename=store_dataset_path + '/fasttext.vec.gz')
+
+
 def original_embedding_file(pretrain='word2vec'):
     """
     Get file path to original unprocessed embeddings

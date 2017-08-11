@@ -1,19 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 import datetime
-import os
-
-import tensorflow as tf
-import math
-
 from dataset.dataset import Dataset
 from dataset.embedding_processor import EmbeddingProcessor
-from evaluate.evaluate import Evaluation
-from model import Model
-from tensorflow.contrib.tensorboard.plugins import projector
-
 from run import Run
-from utils import directory, original_embedding_file
+from utils import store_dataset, filter_pretrained
 
 
 def main():
@@ -25,45 +16,45 @@ def main():
     n = "%i" % datetime.datetime.now().timestamp()
 
     store_dataset(d)
-    # filter_pretrained(ped)
+    # filter_pretrained(ep)
 
-    # Run(n, d, ep, composition='sum', dropout_keep_p=0.75, margin=5,).execute()
-    # Run(n, d, ep, composition='sum', dropout_keep_p=0.75, margin=5, pretraining='fasttext').execute()
-    # Run(n, d, ep, composition='sum', dropout_keep_p=0.75, margin=5, pretraining='word2vec').execute()
-    # Run(n, d, ep, composition='sum', dropout_keep_p=0.75, margin=5, pretraining='glove').execute()
+    Run(n, d, ep, composition='sum', margin=5,).execute()
+    Run(n, d, ep, composition='sum', margin=5, pretraining='fasttext').execute()
+    Run(n, d, ep, composition='sum', margin=5, pretraining='word2vec').execute()
+    Run(n, d, ep, composition='sum', margin=5, pretraining='glove').execute()
 
-    # Run(n, d, ep, composition='avg', dropout_keep_p=0.75, margin=0.25).execute()
-    # Run(n, d, ep, composition='avg', dropout_keep_p=0.75, margin=0.25, pretraining='fasttext').execute()
-    # Run(n, d, ep, composition='avg', dropout_keep_p=0.75, margin=0.25, pretraining='word2vec').execute()
-    # Run(n, d, ep, composition='avg', dropout_keep_p=0.75, margin=0.25, pretraining='glove').execute()
+    Run(n, d, ep, composition='avg').execute()
+    Run(n, d, ep, composition='avg', pretraining='fasttext').execute()
+    Run(n, d, ep, composition='avg', pretraining='word2vec').execute()
+    Run(n, d, ep, composition='avg', pretraining='glove').execute()
 
-    Run(n, d, ep, composition='rnn', dropout_keep_p=0.75, margin=0.25).execute()
-    Run(n, d, ep, composition='rnn', dropout_keep_p=0.75, margin=0.25, pretraining='fasttext').execute()
-    Run(n, d, ep, composition='rnn', dropout_keep_p=0.75, margin=0.25, pretraining='word2vec').execute()
-    Run(n, d, ep, composition='rnn', dropout_keep_p=0.75, margin=0.25, pretraining='glove').execute()
+    Run(n, d, ep, composition='rnn', pretraining='fasttext', refine_after_x_steps=100000).execute()
+    Run(n, d, ep, composition='rnn', pretraining='word2vec', refine_after_x_steps=100000).execute()
+    Run(n, d, ep, composition='rnn', pretraining='glove', refine_after_x_steps=100000).execute()
 
-    Run(n, d, ep, composition='gru', dropout_keep_p=0.75, margin=0.25).execute()
-    Run(n, d, ep, composition='gru', dropout_keep_p=0.75, margin=0.25, pretraining='fasttext').execute()
-    Run(n, d, ep, composition='gru', dropout_keep_p=0.75, margin=0.25, pretraining='word2vec').execute()
-    Run(n, d, ep, composition='gru', dropout_keep_p=0.75, margin=0.25, pretraining='glove').execute()
+    Run(n, d, ep, composition='gru', pretraining='fasttext', refine_after_x_steps=100000).execute()
+    Run(n, d, ep, composition='gru', pretraining='word2vec', refine_after_x_steps=100000).execute()
+    Run(n, d, ep, composition='gru', pretraining='glove', refine_after_x_steps=100000).execute()
 
+    Run(n, d, ep, composition='rnn').execute()
+    Run(n, d, ep, composition='rnn', pretraining='fasttext', refine_after_x_steps=25000).execute()
+    Run(n, d, ep, composition='rnn', pretraining='word2vec', refine_after_x_steps=25000).execute()
+    Run(n, d, ep, composition='rnn', pretraining='glove', refine_after_x_steps=25000).execute()
 
-def store_dataset(d):
-    """Store dataset for use in other applications"""
-    store_dataset_path = directory('/data/compositional_wordnet')
-    d.store_dataset(store_dataset_path)
+    Run(n, d, ep, composition='gru').execute()
+    Run(n, d, ep, composition='gru', pretraining='fasttext', refine_after_x_steps=25000).execute()
+    Run(n, d, ep, composition='gru', pretraining='word2vec', refine_after_x_steps=25000).execute()
+    Run(n, d, ep, composition='gru', pretraining='glove', refine_after_x_steps=25000).execute()
 
+    Run(n, d, ep, composition='prod').execute()
+    Run(n, d, ep, composition='prod', pretraining='fasttext').execute()
+    Run(n, d, ep, composition='prod', pretraining='word2vec').execute()
+    Run(n, d, ep, composition='prod', pretraining='glove').execute()
 
-def filter_pretrained(ped):
-    """Filter pretrained embeddings using our vocabulary, and store for future use"""
-    store_dataset_path = directory('/data/compositional_wordnet')
-
-    ped.process_pretrained_embeddings(input_filename=original_embedding_file('word2vec'),
-                                      output_filename=store_dataset_path + '/word2vec.vec.gz')
-    ped.process_pretrained_embeddings(input_filename=original_embedding_file('glove'),
-                                      output_filename=store_dataset_path + '/glove.vec.gz')
-    ped.process_pretrained_embeddings(input_filename=original_embedding_file('fasttext'),
-                                      output_filename=store_dataset_path + '/fasttext.vec.gz')
+    Run(n, d, ep, composition='max').execute()
+    Run(n, d, ep, composition='max', pretraining='fasttext').execute()
+    Run(n, d, ep, composition='max', pretraining='word2vec').execute()
+    Run(n, d, ep, composition='max', pretraining='glove').execute()
 
 
 if __name__ == '__main__':
