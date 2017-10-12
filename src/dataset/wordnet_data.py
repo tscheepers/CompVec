@@ -2,40 +2,47 @@
 
 import numpy as np
 from utils import pad_sequences
+import random
 
 
-class Data:
+class WordnetData:
     """
     This is a Data class that can be used for a train, test or validation set,
     you can easily batch the data in a Data instance as well as return all data
     """
 
-    def __init__(self, ds_l, ls_d, vocab_size=100000, max_definition_length=32):
+    def __init__(self, ds_l, ls_d, vocab_size=100000, x_max_length=32, y_max_length=16):
         """
         Args:
             ds_l: A dictionary of definitions keyed by lemma
             ls_d: A dictionary of lemmas keyed by defintions
             vocab_size: Vocabulary size
-            max_definition_length: Length of the maximum defintion
-            pad_symbol: index of the padding symbol
+            x_max_length: Length of the maximum defintion
+            y_max_length: Length of the maximum lemma
         """
-
-        self.keys = list()
-
-        for l, ds in ds_l.items():
-            for i in range(len(ds)):
-                self.keys.append([l, i])
-
-        self.keys = np.array(self.keys)
 
         self.ds_l = ds_l
         self.ls_d = ls_d
+
+        self.keys = list()
+
+        self.l_idx = {l: i for i, (l, ds) in enumerate(self.ds_l.items())}
+        self.idx_l = dict(zip(self.l_idx.values(), self.l_idx.keys()))
+
+        for l, ds in ds_l.items():
+            for j in range(len(ds)):
+                i = self.l_idx[l]
+                self.keys.append([i, j])
+
+        self.keys = np.array(self.keys)
 
         self.vocab_size = vocab_size
         self.num_examples = len(self.keys)
         self.epochs_completed = 0
         self.index_in_epoch = 0
-        self.max_definition_length = max_definition_length
+
+        self.x_max_length = x_max_length
+        self.y_max_length = y_max_length
 
     def x_ls(self, n=None):
         """
@@ -46,14 +53,28 @@ class Data:
         if n is None:
             n = len(self.ls_d)
 
-        x = pad_sequences(
-            [ds for i, (ds, ls) in enumerate(self.ls_d.items()) if i <= n],
-            maxlen=self.max_definition_length,
-        )
+        ds = [d for i, (d, ls) in enumerate(self.ls_d.items()) if i <= n]
+        x = pad_sequences(ds, maxlen=self.x_max_length)
 
         lss = [ls for i, (ds, ls) in enumerate(self.ls_d.items()) if i <= n]
 
-        return x, lss
+        return x, ds, lss
+
+    def y_ds(self, n=None):
+        """
+        Get Y for composing all unique lemmas and their (multiple) associated definitions
+        used during evaluation
+        """
+
+        if n is None:
+            n = len(self.ds_l)
+
+        ls = [l for i, (l, ds) in enumerate(self.ds_l.items()) if i <= n]
+        y = pad_sequences(ls, maxlen=self.y_max_length)
+
+        dss = [ds for i, (l, ds) in enumerate(self.ds_l.items()) if i <= n]
+
+        return y, ls, dss
 
     def pairs(self, keys=None):
         """
@@ -64,13 +85,16 @@ class Data:
         if keys is None:
             keys = self.keys
 
-        x = pad_sequences(
-            [self.ds_l[k][i] for k, i in keys],
-            maxlen=self.max_definition_length
-        )
+        pairs = [(self.ds_l[self.idx_l[i]][j], self.idx_l[i]) for i, j in keys]
 
-        y_p = [k for k, i in keys]
-        y_n = np.random.randint(2, self.vocab_size, len(keys))
+        x_t = [x for x, _ in pairs]
+        x = pad_sequences(x_t, maxlen=self.x_max_length)
+
+        y_p_t = [y for _, y in pairs]
+        y_p = pad_sequences(y_p_t, maxlen=self.y_max_length)
+
+        y_n_t = [self.idx_l[random.randint(0, len(self.idx_l) - 1)] for _ in range(len(pairs))]
+        y_n = pad_sequences(y_n_t, maxlen=self.y_max_length)
 
         return x, y_p, y_n
 

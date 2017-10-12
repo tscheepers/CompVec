@@ -10,7 +10,8 @@ class Model:
     """
 
     def __init__(self, batch_size=None,
-                 max_definition_length=32,
+                 x_max_length=32,
+                 y_max_length=16,
                  embedding_size=300,
                  vocab_size=10000,
                  valid_size=10,
@@ -27,17 +28,22 @@ class Model:
         self.margin = margin
         self.composition = composition
         self.stop_gradients_y_n = stop_gradients_y_n
-        self.max_definition_length = max_definition_length
+        self.x_max_length = x_max_length
+        self.y_max_length = y_max_length
         self.summaries = []
 
         # To enter values from the vocabulary
-        self.x = tf.placeholder(tf.int32, shape=(batch_size, max_definition_length), name='x')
-        self.x_mask = tf.placeholder(tf.int32, shape=(batch_size, max_definition_length), name='x_mask')
-        self.y_p = tf.placeholder(tf.int32, shape=(batch_size,), name='y_positive')
-        self.y_n = tf.placeholder(tf.int32, shape=(batch_size,), name='y_negative')
+        self.x = tf.placeholder(tf.int32, shape=(batch_size, x_max_length), name='x')
+        self.x_mask = tf.placeholder(tf.int32, shape=(batch_size, x_max_length), name='x_mask')
+
+        self.y_p = tf.placeholder(tf.int32, shape=(batch_size, y_max_length), name='y_positive')
+        self.y_p_mask = tf.placeholder(tf.int32, shape=(batch_size, y_max_length), name='y_positive_mask')
+
+        self.y_n = tf.placeholder(tf.int32, shape=(batch_size, y_max_length), name='y_negative')
+        self.y_n_mask = tf.placeholder(tf.int32, shape=(batch_size, y_max_length), name='y_negative_mask')
 
         # To enter embeddings directly in evaluation
-        self.x_e = tf.placeholder(tf.float32, shape=(batch_size, max_definition_length, embedding_size), name='x_e')
+        self.x_e = tf.placeholder(tf.float32, shape=(batch_size, x_max_length, embedding_size), name='x_e')
 
         # To set the dropout paramter
         self.dropout_keep_p = tf.placeholder(tf.float32, name='dropout_keep_p')
@@ -58,25 +64,29 @@ class Model:
         """
 
         with tf.variable_scope('x_embeddings_lookup'):
-            e = tf.nn.embedding_lookup(self.embeddings, self.x)
+            xe = tf.nn.embedding_lookup(self.embeddings, self.x)
 
             # We mask the inputs
             mask = tf.cast(tf.transpose(self.x_mask), tf.float32)
-            e = tf.transpose(tf.transpose(e) * mask)
+            xe = tf.transpose(tf.transpose(xe) * mask)
 
             # We apply dropout for regularization
             if dropout:
-                e = tf.nn.dropout(e, self.dropout_keep_p)
+                xe = tf.nn.dropout(xe, self.dropout_keep_p)
 
-            e = tf.cond(
+            xe = tf.cond(
                 tf.equal(self.stop_embedding_gradients, tf.constant(1)),
-                lambda: tf.stop_gradient(e),
-                lambda: e
+                lambda: tf.stop_gradient(xe),
+                lambda: xe
             )
 
         with tf.variable_scope('y_p_embedding_lookup'):
             # Positive target
             ye_p = tf.nn.embedding_lookup(self.embeddings, self.y_p)
+
+            # We mask the inputs
+            mask = tf.cast(tf.transpose(self.y_p_mask), tf.float32)
+            ye_p = tf.transpose(tf.transpose(ye_p) * mask)
 
             ye_p = tf.cond(
                 tf.equal(self.stop_embedding_gradients, tf.constant(1)),
@@ -88,6 +98,10 @@ class Model:
             # Negative target
             ye_n = tf.nn.embedding_lookup(self.embeddings, self.y_n)
 
+            # We mask the inputs
+            mask = tf.cast(tf.transpose(self.y_n_mask), tf.float32)
+            ye_n = tf.transpose(tf.transpose(ye_n) * mask)
+
             # During training we do not want to update the negative targets, so we stop the gradients
             if self.stop_gradients_y_n:
                 ye_n = tf.stop_gradient(ye_n)
@@ -98,9 +112,9 @@ class Model:
                     lambda: ye_n
                 )
 
-        return e, ye_p, ye_n
+        return xe, ye_p, ye_n
 
-    def c_fn(self, e, reuse=False):
+    def c_fn(self, e, mask, reuse=False):
         """
         Compose embeddings e
         """
@@ -111,14 +125,14 @@ class Model:
                 c = tf.reduce_sum(e, axis=1)
             elif self.composition == 'prod':
                 # Problem see: https://github.com/tensorflow/tensorflow/issues/8841
-                e = tf.transpose(e) + (1.0 - tf.cast(tf.transpose(self.x_mask), tf.float32))
+                e = tf.transpose(e) + (1.0 - tf.cast(tf.transpose(mask), tf.float32))
                 c = tf.reduce_prod(tf.transpose(e), axis=1)
             elif self.composition == 'max':
                 c = tf.reduce_max(e, axis=1)
             elif self.composition == 'gru':
                 batch_size = tf.shape(e)[0]
 
-                x_mask = tf.tile(tf.expand_dims(tf.cast(self.x_mask, tf.float32), 2), (1, 1, self.embedding_size))
+                x_mask = tf.tile(tf.expand_dims(tf.cast(mask, tf.float32), 2), (1, 1, self.embedding_size))
 
                 c = tf.scan(
                     lambda result_prev, x: self.gru_layer(
@@ -129,12 +143,12 @@ class Model:
                     ),
                     (tf.transpose(e, [1, 0, 2]), tf.transpose(x_mask, [1, 0, 2])),
                     initializer=tf.zeros([batch_size, self.embedding_size])
-                )[self.max_definition_length - 1]
+                )[self.x_max_length - 1]
 
             elif self.composition == 'rnn':
                 batch_size = tf.shape(e)[0]
 
-                x_mask = tf.tile(tf.expand_dims(tf.cast(self.x_mask, tf.float32), 2), (1, 1, self.embedding_size))
+                x_mask = tf.tile(tf.expand_dims(tf.cast(mask, tf.float32), 2), (1, 1, self.embedding_size))
 
                 c = tf.scan(
                     lambda result_prev, x: self.rnn_layer(
@@ -145,11 +159,15 @@ class Model:
                     ),
                     (tf.transpose(e, [1, 0, 2]), tf.transpose(x_mask, [1, 0, 2])),
                     initializer=tf.zeros([batch_size, self.embedding_size])
-                )[self.max_definition_length - 1]
+                )[self.x_max_length - 1]
+
+            elif self.composition == 'cnn':
+
+                c = self.conv_layer(e, reuse=reuse)
 
             else:  # avg
                 c = tf.transpose(tf.reduce_sum(e, axis=1))
-                c /= tf.cast(tf.reduce_sum(self.x_mask, axis=1), tf.float32)
+                c /= tf.cast(tf.reduce_sum(mask, axis=1), tf.float32)
                 c = tf.transpose(c)
 
         return c
@@ -187,16 +205,19 @@ class Model:
         """
 
         # Embedded values
-        e, ye_p, ye_n = self.es_fn()
+        xe, ye_p, ye_n = self.es_fn()
 
         # Composed embedding
-        compose_x = self.c_fn(e)
+        xc = self.c_fn(xe, self.x_mask)
+        yc_p = self.c_fn(ye_p, self.y_p_mask, reuse=True)
+        yc_n = self.c_fn(ye_n, self.y_n_mask, reuse=True)
+
         # To compose outside embeddings directly
-        compose_x_e = self.c_fn(self.x_e, reuse=True)
+        x_ec = self.c_fn(self.x_e, self.x_mask, reuse=True)
 
         # Loss
-        loss = self.loss_fn(compose_x, ye_p, ye_n)
-        return loss, compose_x, compose_x_e
+        loss = self.loss_fn(xc, yc_p, yc_n)
+        return loss, xc, x_ec, yc_p
 
     def similarity(self):
         """
@@ -282,7 +303,37 @@ class Model:
 
         return h_retain
 
-    def feed_dict(self, x, y_p=None, y_n=None, dropout_keep_p=1.0, stop_embedding_gradients=False):
+    def conv_layer(self, e, filter_width=3, reuse=False):
+        """
+        Convolutional layer
+        See: http://www.wildml.com/2015/12/implementing-a-cnn-for-text-classification-in-tensorflow/
+        """
+
+        with tf.variable_scope("conv_pool", reuse=reuse):
+
+            # Add padding for wide convolution
+            e = tf.pad(e, [(0, 0), (filter_width - 1, filter_width - 1), (0, 0)], "CONSTANT")
+
+            # Expand dims to make it comparable to multi-channel convolutions
+            e = tf.expand_dims(e, -1)
+
+            W = tf.get_variable(name='weight_input', shape=(filter_width, self.embedding_size, 1, self.embedding_size),
+                                initializer=tf.random_normal_initializer(stddev=0.1))
+
+            conv = tf.nn.conv2d(e, W, strides=(1, 1, 1, 1), padding="VALID", name="conv")
+
+            b = tf.get_variable(name='bias', shape=(self.embedding_size,), initializer=tf.constant_initializer(0.0))
+
+            h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
+
+            pooled = tf.nn.max_pool(h, ksize=(1, self.x_max_length + filter_width - 1, 1, 1),
+                                    strides=(1, 1, 1, 1), padding="VALID", name="pool")
+
+            c = tf.squeeze(pooled)
+
+        return c
+
+    def feed_dict(self, x=None, y_p=None, y_n=None, dropout_keep_p=1.0, stop_embedding_gradients=False):
         """
         Create feed dictionary for the Tensorflow model
         """
@@ -292,23 +343,31 @@ class Model:
 
         mask = np.vectorize(mask)
 
-        if x.ndim == 3:  # Input embeddings directly
+        if x is not None:
+            if x.ndim == 3:  # Input embeddings directly
+                result = {
+                    self.x_e: x,
+                    self.x_mask: mask(np.sum(x, axis=2))
+                }
+            else:  # Default: input indices for the embedding matrix
+                result = {
+                    self.x: x,
+                    self.x_mask: mask(x),
+                    self.dropout_keep_p: dropout_keep_p,
+                    self.stop_embedding_gradients: 1 if stop_embedding_gradients else 0
+                }
+        else:
             result = {
-                self.x_e: x,
-                self.x_mask: mask(np.sum(x, axis=2))
-            }
-        else:  # Default: input indices for the embedding matrix
-            result = {
-                self.x: x,
-                self.x_mask: mask(x),
                 self.dropout_keep_p: dropout_keep_p,
                 self.stop_embedding_gradients: 1 if stop_embedding_gradients else 0
             }
 
         if y_p is not None:
             result[self.y_p] = y_p
+            result[self.y_p_mask] = mask(y_p)
 
         if y_n is not None:
             result[self.y_n] = y_n
+            result[self.y_n_mask] = mask(y_n)
 
         return result

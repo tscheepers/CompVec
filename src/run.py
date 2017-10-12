@@ -40,7 +40,7 @@ class Run:
         self.refine_after_x_steps = refine_after_x_steps
 
         self.run_dir = directory('/out/run-%s' % run_group_name, ['logs', 'tsne', 'embeddings', 'output'])
-        self.data_dir = directory('/data/compositional_wordnet')
+        self.data_dir = embedding_processor.path
 
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -48,7 +48,8 @@ class Run:
             # Model
             self.model = Model(
                 embedding_size=embedding_size,
-                max_definition_length=self.dataset.max_definition_length,
+                x_max_length=self.dataset.x_max_length,
+                y_max_length=self.dataset.y_max_length,
                 vocab_size=self.dataset.vocab_size,
                 margin=margin,
                 composition=composition,
@@ -69,11 +70,11 @@ class Run:
         """
         Get the run name
         """
-        return '%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-em%d-r%d' % (
+        return '%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-my%d-em%d-r%d' % (
             self.model.composition, ('random' if self.pretraining is None else self.pretraining),
             self.dropout_keep_p, self.model.margin, int(self.model.stop_gradients_y_n),
-            self.learning_rate, self.batch_size, self.dataset.max_definition_length, self.model.embedding_size,
-            self.refine_after_x_steps
+            self.learning_rate, self.batch_size, self.dataset.x_max_length, self.dataset.y_max_length,
+            self.model.embedding_size, self.refine_after_x_steps
         )
 
     # noinspection PyAttributeOutsideInit
@@ -83,10 +84,10 @@ class Run:
         """
 
         # Optimizer
-        self.loss_op, self.compose_op, self.compose_e_op = self.model.fn()
+        self.loss_op, self.compose_op, self.compose_e_op, self.compose_y_op = self.model.fn()
         self.optimize_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss_op)
 
-        # Add variable initializer.
+        # Add variable initializer
         self.init_op = tf.global_variables_initializer()
 
         # Summary
@@ -221,7 +222,7 @@ class Run:
 
             # Run our self-designed NN evaluation metric
             t0 = time.time()
-            nn_r = self.evaluation.nn.evaluate(self.session, self.compose_op)
+            nn_r = self.evaluation.nn.evaluate(self.session, self.compose_op, self.compose_y_op)
             feed_dict = self.evaluation.nn.feed_dict(nn_r, feed_dict=feed_dict)
 
             # Run word similarity evaluation for metrics as fromwordvectors.org

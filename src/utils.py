@@ -18,7 +18,7 @@ def store_dataset(d):
 
 def filter_pretrained(ep):
     """Filter pretrained embeddings using our vocabulary, and store for future use"""
-    store_dataset_path = directory('/data/compositional_wordnet')
+    store_dataset_path = ep.path
 
     ep.process_pretrained_embeddings(input_filename=original_embedding_file('word2vec'),
                                      output_filename=store_dataset_path + '/word2vec.vec.gz')

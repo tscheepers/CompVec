@@ -3,7 +3,8 @@
 import gzip
 import numpy as np
 from sys import stdout
-from dataset import dataset
+from dataset import wordnet_dataset
+from utils import directory
 
 
 class EmbeddingProcessor:
@@ -11,12 +12,17 @@ class EmbeddingProcessor:
     This class can process embedding data files, load them, save them and filter them using a vocabulary
     """
 
-    def __init__(self, vocabulary=None):
+    def __init__(self, vocabulary=None, path=None):
 
         if vocabulary is None:
             self.vocabulary = dict()
         else:
             self.vocabulary = vocabulary
+
+        if path is None:
+            self.path = directory('/data/compositional_wordnet')
+        else:
+            self.path = path
 
         self.reversed_vocabulary = dict(zip(self.vocabulary.values(), self.vocabulary.keys()))
 
@@ -64,7 +70,7 @@ class EmbeddingProcessor:
             split = line.split()
             if len(split) == embedding_size + 1 and \
                split[0] in self.vocabulary and \
-               self.vocabulary[split[0]] not in [dataset.PAD_SYMBOL, dataset.UNK_SYMBOL]:
+               self.vocabulary[split[0]] not in [wordnet_dataset.PAD_SYMBOL, wordnet_dataset.UNK_SYMBOL]:
                 embeddings[self.vocabulary[split[0]]] = np.array([float(x) for x in split[1:]])
             else:
                 skipped_lines += 1

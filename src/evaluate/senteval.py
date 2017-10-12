@@ -12,7 +12,7 @@ from senteval import SentEval
 from dataset.embedding_processor import EmbeddingProcessor
 from utils import pad_sequences, dotdict, directory, original_embedding_file
 
-PATH_TO_DATA = '../../../modules/senteval/data/senteval_data'
+PATH_TO_DATA = '../../data/senteval_data'
 
 EVALUATIONS = [
     # Stanford Sentence Evaluation
@@ -21,25 +21,25 @@ EVALUATIONS = [
     'CR',  # Product Review
     'SUBJ',  # Subjectivity Status
     'MPQA',  # Opinion Polarity
-
+    
     # Sentiment Analysis
     # https://nlp.stanford.edu/sentiment/index.html
     # http://www.aclweb.org/anthology/P13-1045
     'SST',
-
+    
     # Question-Type Classification
     # http://cogcomp.cs.illinois.edu/Data/QA/QC/
     'TREC',
-
+    
     # Paraphrase detection
     # https://www.microsoft.com/en-us/download/details.aspx?id=52398
     'MRPC',
-
+    
     # Sentences Involving Compositional Knowledge
     # http://clic.cimec.unitn.it/composes/sick.html
     'SICKEntailment',
     'SICKRelatedness',
-
+    
     # Semantic Textual Similarity, SemEval
     'STSBenchmark',  # http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark
     'STS14',  # http://alt.qcri.org/semeval2014/task10/
@@ -91,7 +91,7 @@ class SentEvalEvaluation:
 
             for i, wts in enumerate(batch):  # For word tokens in sentence
 
-                embedding = np.zeros((d.max_definition_length, m.embedding_size))
+                embedding = np.zeros((d.x_max_length, m.embedding_size))
 
                 j = 0
                 for wt in wts:
@@ -104,7 +104,7 @@ class SentEvalEvaluation:
                     elif wt in p.fallback_embeddings:
                         embedding[j, :] = p.fallback_embeddings[wt]
                         j += 1
-                    if j >= d.max_definition_length:
+                    if j >= d.x_max_length:
                         break
 
                 if j != 0:
@@ -130,7 +130,7 @@ class SentEvalEvaluation:
                               'kfold': 5,
                               'batch_size': 128})
 
-            # logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
+            logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
 
             r = SentEval(params, batcher, prepare).eval(evaluation)
             result_value = 0
@@ -165,7 +165,7 @@ class SentEvalEvaluation:
         return {token: i for i, (token, count) in enumerate(vocab_ns)}
 
     @staticmethod
-    def read_fallback_embeddings(vocabulary, pretrain='word2vec', evaluation='MR'):
+    def read_fallback_embeddings(vocabulary, pretrain=None, evaluation='MR'):
 
         original_embedding_path = original_embedding_file(pretrain)
 

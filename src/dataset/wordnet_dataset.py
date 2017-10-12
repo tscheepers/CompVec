@@ -3,7 +3,7 @@ import random
 from collections import defaultdict
 import operator
 import gzip
-from dataset.data import Data
+from dataset.wordnet_data import WordnetData
 from dataset.wordnet_fetcher import WordnetFetcher
 
 
@@ -12,10 +12,11 @@ UNK_SYMBOL = 1
 SEPERATOR = '|||'
 
 
-class Dataset:
-    def __init__(self, vocab_limit=1000000, test_split=0.05, max_definition_length=32):
+class WordnetDataset:
+    def __init__(self, vocab_limit=1000000, test_split=0.05, x_max_length=32, y_max_length=16):
 
-        self.max_definition_length = max_definition_length
+        self.x_max_length = x_max_length
+        self.y_max_length = y_max_length
 
         wordnet = WordnetFetcher()
 
@@ -23,7 +24,7 @@ class Dataset:
         ds, d_vocab_ns = wordnet.fetch_definitions()
 
         # fetch target words per definitions
-        ls, l_vocab_ns = wordnet.fetch_lemmas(ds)
+        ls, l_vocab_ns = wordnet.fetch_lemmas(ds, multi_word_lemmas=True)
 
         # Sort the vocabulary by frequency, frequent words on top
         vocab_ns = sorted(d_vocab_ns.items(), key=operator.itemgetter(1), reverse=True)
@@ -52,13 +53,22 @@ class Dataset:
         """
 
         data = list()
+        data_dict = dict() # for fast checking O(1) for doubles
 
-        for (l_id, l_ts) in ls.items():
-            l_t = l_ts[0]  # We only fetch one token lemmas
-            if l_t in self.vocabulary:
-                l = self.vocabulary[l_t]
-                d = tuple([(self.vocabulary[d_t] if d_t in self.vocabulary else UNK_SYMBOL) for d_t in ds[l_id]])
-                data.append((l, d))
+        for (l_id, l_tss) in ls.items():
+
+            # For every possible lemma for the definition_id
+            for l_ts in l_tss:
+
+                l = tuple([(self.vocabulary[l_t] if l_t in self.vocabulary else UNK_SYMBOL) for l_t in l_ts])
+
+                if not all(ls == UNK_SYMBOL for ls in l):
+                    d = tuple([(self.vocabulary[d_t] if d_t in self.vocabulary else UNK_SYMBOL) for d_t in ds[l_id]])
+                    x = (l, d) # data point
+
+                    if x not in data_dict:
+                        data_dict[x] = 1
+                        data.append(x)
 
         return data
 
@@ -117,7 +127,11 @@ class Dataset:
                     break
 
         return tuple([
-             Data(ds_l, ls_d, self.vocab_size, self.max_definition_length)
+            WordnetData(ds_l, ls_d,
+                  vocab_size=self.vocab_size,
+                  x_max_length=self.x_max_length,
+                  y_max_length=self.y_max_length
+                  )
              for _, _, ds_l, ls_d, _
              in gs
          ])
@@ -140,9 +154,11 @@ class Dataset:
             data = self.train
 
         with gzip.open(filename, 'w') as f:
-            for k, i in data.keys:
-                d = ' '.join(['%s' % self.reversed_vocabulary[t] for t in data.ds_l[k][i]])
-                f.write(bytes('%s %s %s\n' % (self.reversed_vocabulary[k], SEPERATOR, d), 'UTF-8'))
+            for i, j in data.keys:
+                k = data.idx_l[i]
+                d = ' '.join(['%s' % self.reversed_vocabulary[t] for t in data.ds_l[k][j]])
+                l = ' '.join(['%s' % self.reversed_vocabulary[t] for t in k])
+                f.write(bytes('%s %s %s\n' % (l, SEPERATOR, d), 'UTF-8'))
 
         return filename
 

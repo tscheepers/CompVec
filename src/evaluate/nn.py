@@ -14,40 +14,41 @@ class NNEvaluation:
 
         # CompositionalWordNet Ranking
         # Analyzing the compositional properties of word embeddings (Scheepers et al. 2017)
-        self.mnr = tf.placeholder(tf.float32)  # Mean Normalized Rank
-        self.mrr = tf.placeholder(tf.float32)  # Mean Reciprocal Rank
-        self.map = tf.placeholder(tf.float32)  # Mean Average Precision
-        self.mpa10 = tf.placeholder(tf.float32)  # Mean Precision@10
+        self.mnr = tf.placeholder(tf.float32, name='NN/MNR')  # Mean Normalized Rank
+        self.mrr = tf.placeholder(tf.float32, name='NN/MRR')  # Mean Reciprocal Rank
+        self.map = tf.placeholder(tf.float32, name='NN/MAP')  # Mean Average Precision
+        self.mpa10 = tf.placeholder(tf.float32, name='NN/MP_10')  # Mean Precision@10
 
         self.summaries = []
 
-    def evaluate(self, tf_session, compose_op, n_definitions=None):
+    def evaluate(self, tf_session, compose_x_op, compose_y_op, n_definitions=None):
 
         # Compose all definitions
-        xs, lss = self.d.test.x_ls(n_definitions)
-        cs, = tf_session.run([compose_op], self.m.feed_dict(xs))
-        cs = np.array(cs)
+        x, ds, lss = self.d.test.x_ls(n_definitions)
+        xc, = tf_session.run([compose_x_op], self.m.feed_dict(x=x))
+        xc = np.array(xc)
+
+        y, ls, dss = self.d.test.y_ds(n_definitions)
+        yc, = tf_session.run([compose_y_op], self.m.feed_dict(y_p=y))
+        yc = np.array(yc)
 
         # Rank all definitions
-        r = self.rank(cs, lss)
+        r = self.rank(xc, yc, ls, lss)
 
         # Calculate metrics
         metrics = self.calculate_metrics(r)
 
         return metrics
 
-    def rank(self, cs, lss):
+    def rank(self, cs, yc, ls, lss):
 
-        embedding_matrix = self.m.embeddings.eval()
-
-        target_embeddings = [embedding_matrix[k, :] for k in self.d.targets]
-        targets = {k: i for i, k in enumerate(self.d.targets)}
+        targets = {l: i for (i, l) in enumerate(ls)}
 
         # Number of results (lemmas) ranked
-        n_results = len(target_embeddings)
+        n_results = len(yc)
 
         # Build ball tree model
-        ball_tree = BallTree(np.array(target_embeddings))
+        ball_tree = BallTree(yc)
 
         rs = ball_tree.query(cs, k=n_results, return_distance=False)
 

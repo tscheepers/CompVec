@@ -21,7 +21,7 @@ NUMBER_OF_SENSES = 206941
 # Database connection information
 DATABASE_HOST = 'localhost'
 DATABASE_USER = 'root'
-DATABASE_PASS = ''
+DATABASE_PASS = 'password'
 DATABASE_DB = 'wordnet30'
 
 
