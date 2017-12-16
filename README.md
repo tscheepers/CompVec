@@ -25,8 +25,8 @@ In our analysis, we evaluate original as well as tuned embeddings using existing
 Papers
 ---
 
-- `Improving the Compositionality of Word Embeddings (MSc Thesis)` [PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf)
-- `Analyzing the compositional properties of word embeddings` [PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
+- **Improving the Compositionality of Word Embeddings** [Thesis PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf), [Presentation PDF](https://thijs.ai/papers/scheepers-msc-thesis-presentation.pdf)
+- **Analyzing the compositional properties of word embeddings** [Paper PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
 
 Results
 ----
