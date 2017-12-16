@@ -5,21 +5,18 @@ from tensorflow.contrib.keras.python.keras.preprocessing.sequence import pad_seq
 
 PAD_SYMBOL = 0
 
-WORD2VEC_FILE_NAME = 'GoogleNews-vectors-negative300.txt'
-GLOVE_FILE_NAME = 'glove.840B.300d.txt'
-FASTTEXT_FILE_NAME = 'wiki.en.vec'
-
-
-def store_dataset(d):
-    """Store dataset for use in other applications"""
-    store_dataset_path = directory('/data/compositional_wordnet')
-    d.store_dataset(store_dataset_path)
+WORD2VEC_FILE_NAME = 'word2vec_googlenews.vec'
+GLOVE_FILE_NAME = 'glove_840b.vec'
+FASTTEXT_FILE_NAME = 'fasttext_wiki_en.vec'
+PARAGRAM_FILE_NAME = 'paragram_merged_xxl_simlex.vec'
 
 
 def filter_pretrained(ep):
     """Filter pretrained embeddings using our vocabulary, and store for future use"""
     store_dataset_path = ep.path
 
+    ep.process_pretrained_embeddings(input_filename=original_embedding_file('paragram'),
+                                     output_filename=store_dataset_path + '/paragram.vec.gz')
     ep.process_pretrained_embeddings(input_filename=original_embedding_file('word2vec'),
                                      output_filename=store_dataset_path + '/word2vec.vec.gz')
     ep.process_pretrained_embeddings(input_filename=original_embedding_file('glove'),
@@ -41,6 +38,8 @@ def original_embedding_file(pretrain='word2vec'):
         return data_path + '/' + WORD2VEC_FILE_NAME
     elif pretrain == 'fasttext':
         return data_path + '/' + FASTTEXT_FILE_NAME
+    elif pretrain == 'paragram':
+        return data_path + '/' + PARAGRAM_FILE_NAME
     else:
         return None
 

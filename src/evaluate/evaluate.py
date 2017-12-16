@@ -1,8 +1,10 @@
 # coding: utf-8
 
-from evaluate.nn import NNEvaluation
+from evaluate.compveceval import CompVecEvalEvaluation
 from evaluate.senteval import SentEvalEvaluation
 from evaluate.wordsim import WordSimEvaluation
+from dataset.wordnet_data import WordnetData
+from utils import directory
 
 
 class Evaluation:
@@ -14,7 +16,10 @@ class Evaluation:
         self.m = model
         self.d = dataset
 
-        self.nn = NNEvaluation(self.m, self.d)
+        path = directory('/data/wordnetsingle/') + 'test_data.gz'
+        self.compveceval_test = WordnetData.from_path(path, self.d.vocabulary, self.d.x_max_length, self.d.y_max_length)
+
+        self.compveceval = CompVecEvalEvaluation(self.m, self.compveceval_test)
         self.senteval = SentEvalEvaluation(self.m, self.d)
         self.wordsim = WordSimEvaluation(self.m, self.d)
 
@@ -71,6 +76,7 @@ class Evaluation:
                              va='bottom')
 
             plt.savefig(filename)
+            plt.close()
 
             return filename
 

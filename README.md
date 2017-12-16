@@ -6,18 +6,37 @@ Word embeddings are tuned using a simple neural network architecture with defini
 
 The model is written using Tensorflow and can compose embeddings using [multiple composition functions](src/model.py#L89):
 
-- Sum (arithmetic composition)
-- Avg/Mean (arithmetic composition)
-- Prod (arithmetic composition)
-- Max (arithmetic composition)
+- Sum (algebraic composition)
+- Avg/Mean (algebraic composition)
+- Prod (algebraic composition)
+- Max (algebraic composition)
+- Sum Projection (learning to compose)
 - RNN (learning to compose)
 - GRU (learning to compose)
+- Bi-directional GRU (learning to compose)
+- CNN (learning to compose)
 
 In our analysis, we evaluate original as well as tuned embeddings using existing word similarity and sentence embedding evaluation methods. But aside from these evaluation measures used in related we also evaluate using a novel ranking method which uses a dictionary based dataset of lemmas and definitions from WordNet. Dictionary definitions are inherently compositional and this makes them very suitable for such an evaluation method. In contrast to other evaluation methods, ours is not invariant to the magnitude of the embedding vector—which we show is essential for composition. We consider this new evaluation method to be a key contribution.
 
 - [CompVecEval](src/evaluate/nn.py), a ball tree nearest neightbour ranking approach using a held out set from wordnet to deterine the compositional power of the embeddings. This is a method we developed ourselves and is not invariant to the embeddingvector's mangitude. Our method also takes the many-to-many lemma definition relationships in wordnet into account.
 - [SentEval](src/evaluate/senteval.py), sentence evaluation against various tasks and dataset.
 - [WordSim](src/evaluate/wordsim.py), word vector evaluation against various word similairty dataset.
+
+Papers
+---
+
+- `Improving the Compositionality of Word Embeddings (MSc Thesis)` [PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf)
+- `Analyzing the compositional properties of word embeddings` [PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
+
+Results
+----
+
+Tuned pretrained embeddings can be downloaded at:
+
+- `fasttext_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/fasttext_tuned.vec.gz)
+- `glove_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/glove_tuned.vec.gz)
+- `paragram_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/paragram_tuned.vec.gz)
+- `word2vec_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/word2vec_tuned.vec.gz)
 
 
 License (MIT)

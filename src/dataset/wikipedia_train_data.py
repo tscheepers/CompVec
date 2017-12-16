@@ -31,7 +31,6 @@ class WikipediaTrainData:
         self.f = open(path)
 
         self.vocab_size = dataset.vocab_size
-        self.num_examples = len(self.keys)
         self.epochs_completed = 0
 
         self.x_max_length = x_max_length
@@ -68,12 +67,15 @@ class WikipediaTrainData:
                 line = self.f.readline()
 
             s = line.split(SEPERATOR)
-            if len(s) == 2:
-                l, d = s
+            if len(s) != 2:
+                continue
 
-                d = tuple([(self.ds.vocabulary[t] if t in self.ds.vocabulary else UNK_SYMBOL) for t in d.split()])
-                l = tuple([(self.ds.vocabulary[t] if t in self.ds.vocabulary else UNK_SYMBOL) for t in l.split()])
+            l, d = s
 
-                keys.append((d, l))
+            d = tuple([(self.ds.vocabulary[t] if t in self.ds.vocabulary else UNK_SYMBOL) for t in d.split()])
+            l = tuple([(self.ds.vocabulary[t] if t in self.ds.vocabulary else UNK_SYMBOL) for t in l.split()])
+
+            if len(d) >= 1 and len(l) >= 1:
+                keys.append((l, d))
 
         return self.pairs(keys)

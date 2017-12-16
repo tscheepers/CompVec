@@ -21,29 +21,32 @@ EVALUATIONS = [
     'CR',  # Product Review
     'SUBJ',  # Subjectivity Status
     'MPQA',  # Opinion Polarity
-    
+
     # Sentiment Analysis
     # https://nlp.stanford.edu/sentiment/index.html
     # http://www.aclweb.org/anthology/P13-1045
     'SST',
-    
+
     # Question-Type Classification
     # http://cogcomp.cs.illinois.edu/Data/QA/QC/
     'TREC',
-    
+
     # Paraphrase detection
     # https://www.microsoft.com/en-us/download/details.aspx?id=52398
     'MRPC',
-    
+
     # Sentences Involving Compositional Knowledge
     # http://clic.cimec.unitn.it/composes/sick.html
     'SICKEntailment',
     'SICKRelatedness',
-    
+
     # Semantic Textual Similarity, SemEval
     'STSBenchmark',  # http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark
+    'STS12',
+    'STS13',
     'STS14',  # http://alt.qcri.org/semeval2014/task10/
-    'STS16'
+    'STS15',
+    'STS16',
 ]
 
 
@@ -63,7 +66,7 @@ class SentEvalEvaluation:
 
         self.summaries = []
 
-    def evaluate(self, tf_session, compose_op, pretrain=None):
+    def evaluate(self, tf_session, compose_op, pretrain=None, thorough=False):
 
         m = self.m
         d = self.d
@@ -101,8 +104,8 @@ class SentEvalEvaluation:
                     if wt in self.d.vocabulary:
                         embedding[j, :] = p.embedding_matrix[self.d.vocabulary[wt], :]
                         j += 1
-                    elif wt in p.fallback_embeddings:
-                        embedding[j, :] = p.fallback_embeddings[wt]
+                    elif p.fallback_vocabulary[wt] in p.fallback_embeddings:
+                        embedding[j, :] = p.fallback_embeddings[p.fallback_vocabulary[wt]]
                         j += 1
                     if j >= d.x_max_length:
                         break
@@ -119,7 +122,8 @@ class SentEvalEvaluation:
 
             return result
 
-        results = dict()
+        results_for_tf = dict()
+        results_for_out = dict()
 
         for evaluation in EVALUATIONS:
             path = os.path.join(os.path.dirname(os.path.realpath(__file__)), PATH_TO_DATA)
@@ -127,27 +131,55 @@ class SentEvalEvaluation:
             # Set params for SentEval
             params = dotdict({'task_path': path,
                               'usepytorch': self.evaluate_use_pytorch(evaluation),
-                              'kfold': 5,
-                              'batch_size': 128})
+                              'kfold': 10 if thorough else 2,
+                              'batch_size': 64})
 
-            logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
+            # logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
 
             r = SentEval(params, batcher, prepare).eval(evaluation)
             result_value = 0
 
             try:
                 if 'all' in r:
-                    result_value = r['all']['spearman']['wmean']
-                elif 'spearman' in r:
-                    result_value = r['spearman']
+                    result_value = r['all']['pearson']['wmean']
+                elif 'pearson' in r:
+                    result_value = r['pearson']
+                    results_for_out['%s/pearson/r' % (evaluation)] = r['pearson']
+                    results_for_out['%s/spearman/r' % (evaluation)] = r['spearman']
                 else:
                     result_value = r['acc']
             except KeyError:
                 print('KeyError', evaluation, r)
 
-            results[evaluation] = result_value
+            results_for_tf[evaluation] = result_value
+            results_for_out[evaluation] = result_value
 
-        return results
+            if evaluation == 'STS12':
+                self._fill_results(results_for_out, r, 'STS12', ['MSRpar', 'MSRvid', 'SMTeuroparl', 'surprise.OnWN', 'surprise.SMTnews'])
+
+            if evaluation == 'STS13':
+                self._fill_results(results_for_out, r, 'STS13', ['FNWN', 'OnWN', 'headlines'])
+
+            if evaluation == 'STS14':
+                self._fill_results(results_for_out, r, 'STS14', ['deft-forum', 'deft-news', 'headlines', 'images', 'OnWN', 'tweet-news'])
+
+            if evaluation == 'STS15':
+                self._fill_results(results_for_out, r, 'STS15', ['answers-forums', 'answers-students', 'belief', 'headlines', 'images'])
+
+            if evaluation == 'STS16':
+                self._fill_results(results_for_out, r, 'STS16', ['answer-answer', 'headlines', 'plagiarism', 'postediting', 'question-question'])
+
+        return results_for_tf, results_for_out
+
+    @staticmethod
+    def _fill_results(results, raw, e, ses):
+        for se in ses:
+
+            results['%s/%s/pearson/r' % (e, se)] = raw[se]['pearson'][0]
+            results['%s/%s/pearson/p' % (e, se)] = raw[se]['pearson'][1]
+            results['%s/%s/spearman/r' % (e, se)] = raw[se]['spearman'][0]
+            results['%s/%s/spearman/p' % (e, se)] = raw[se]['spearman'][1]
+            results['%s/%s/n' % (e, se)] = raw[se]['nsamples']
 
     @staticmethod
     def create_vocabulary(sentences):
@@ -179,7 +211,9 @@ class SentEvalEvaluation:
             ped.process_pretrained_embeddings(input_filename=original_embedding_path,
                                               output_filename=processed_embeddings_path)
 
-        return ped.read_embeddings(processed_embeddings_path)
+        embeddings = ped.read_embeddings(processed_embeddings_path)
+
+        return embeddings
 
     @staticmethod
     def evaluate_use_pytorch(evaluation):

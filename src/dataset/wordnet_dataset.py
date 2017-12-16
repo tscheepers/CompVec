@@ -13,7 +13,14 @@ SEPERATOR = '|||'
 
 
 class WordnetDataset:
-    def __init__(self, vocab_limit=1000000, test_split=0.05, x_max_length=32, y_max_length=16):
+    """
+    An instance of this class can create a nice train, test split from WordNet definitions data.
+    The data is fetched directly from a MySQL database, through the WordnetFetcher
+    """
+
+    def __init__(self, test_data_path=None, vocab_limit=1000000, test_split=0.05, x_max_length=32, y_max_length=16):
+
+        self.name = 'wordnet-%s' % ('multi' if y_max_length > 1 else 'single')
 
         self.x_max_length = x_max_length
         self.y_max_length = y_max_length
@@ -24,7 +31,7 @@ class WordnetDataset:
         ds, d_vocab_ns = wordnet.fetch_definitions()
 
         # fetch target words per definitions
-        ls, l_vocab_ns = wordnet.fetch_lemmas(ds, multi_word_lemmas=True)
+        ls, l_vocab_ns = wordnet.fetch_lemmas(ds, multi_word_lemmas=(True if y_max_length > 1 else False))
 
         # Sort the vocabulary by frequency, frequent words on top
         vocab_ns = sorted(d_vocab_ns.items(), key=operator.itemgetter(1), reverse=True)
@@ -43,11 +50,14 @@ class WordnetDataset:
         self.target_vocabulary = {self.reversed_vocabulary[t]: t for t in self.targets}
         self.reversed_target_vocabulary = {t: self.reversed_vocabulary[t] for t in self.targets}
 
-        data = self._data(ds, ls)
+        if test_data_path is None:
+            data = self._data(ds, ls)
+            self.test, self.train = self._data_split([test_split, (1.0 - test_split)], data)
+        else:
+            self.test = WordnetData.from_path(test_data_path, self.vocabulary, self.x_max_length, self.y_max_length)
+            self.train, = self._data_split([1.0], self._data(ds, ls, skip_from_data=self.test))
 
-        self.test, self.train = self._data_split([test_split, (1.0 - test_split)], data)
-
-    def _data(self, ds, ls):
+    def _data(self, ds, ls, skip_from_data=None):
         """
         Build the definition dictionary, with a list of definitions per target word
         """
@@ -64,6 +74,13 @@ class WordnetDataset:
 
                 if not all(ls == UNK_SYMBOL for ls in l):
                     d = tuple([(self.vocabulary[d_t] if d_t in self.vocabulary else UNK_SYMBOL) for d_t in ds[l_id]])
+
+                    if skip_from_data is not None and l in skip_from_data.ds_l:
+                        continue # Skip because l in data
+
+                    if skip_from_data is not None and d in skip_from_data.ls_d:
+                        continue  # Skip because d in data
+
                     x = (l, d) # data point
 
                     if x not in data_dict:

@@ -1,15 +1,49 @@
 # coding: utf-8
 
 import numpy as np
+from collections import defaultdict
 from utils import pad_sequences
 import random
+import gzip
 
+PAD_SYMBOL = 0
+UNK_SYMBOL = 1
+SEPERATOR = ' ||| '
 
 class WordnetData:
     """
     This is a Data class that can be used for a train, test or validation set,
     you can easily batch the data in a Data instance as well as return all data
     """
+
+    @classmethod
+    def from_path(cls, path, vocabulary, x_max_length=32, y_max_length=16):
+        """
+        Open WordnetData directly from datafile.
+        """
+
+        ds_l = defaultdict(list)
+        ls_d = defaultdict(list)
+
+        with gzip.open(path, 'r') as f:
+            for line in f:
+                line = line.decode("UTF-8")
+                s = line.split(SEPERATOR)
+
+                if len(s) != 2:
+                    continue
+
+                ls, ds = s[0].split(), s[1].split()
+                if len(ls) == 0 or len(ds) == 0:
+                    continue
+
+                l = tuple([(vocabulary[lt] if lt in vocabulary else UNK_SYMBOL) for lt in ls])
+                d = tuple([(vocabulary[dt] if dt in vocabulary else UNK_SYMBOL) for dt in ds])
+
+                ds_l[l] += [d]
+                ls_d[d] += [l]
+
+        return cls(ds_l, ls_d, vocab_size=len(vocabulary), x_max_length=x_max_length, y_max_length=y_max_length)
 
     def __init__(self, ds_l, ls_d, vocab_size=100000, x_max_length=32, y_max_length=16):
         """

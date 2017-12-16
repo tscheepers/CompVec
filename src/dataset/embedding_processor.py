@@ -71,7 +71,13 @@ class EmbeddingProcessor:
             if len(split) == embedding_size + 1 and \
                split[0] in self.vocabulary and \
                self.vocabulary[split[0]] not in [wordnet_dataset.PAD_SYMBOL, wordnet_dataset.UNK_SYMBOL]:
-                embeddings[self.vocabulary[split[0]]] = np.array([float(x) for x in split[1:]])
+
+                embedding = np.array([float(x) for x in split[1:]])
+                norm = np.linalg.norm(embedding)
+
+                embeddings[self.vocabulary[split[0]]] = embedding
+
+
             else:
                 skipped_lines += 1
 

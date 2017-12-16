@@ -21,7 +21,7 @@ NUMBER_OF_SENSES = 206941
 # Database connection information
 DATABASE_HOST = 'localhost'
 DATABASE_USER = 'root'
-DATABASE_PASS = 'password'
+DATABASE_PASS = ''
 DATABASE_DB = 'wordnet30'
 
 
@@ -167,10 +167,8 @@ class WordnetFetcher:
 
                     if len(tokens) > 0:
 
-                        if multi_word_lemmas:
+                        if multi_word_lemmas or len(tokens) == 1:
                             lemma_per_definition[int(identifier)].append(tokens)
-                        elif len(tokens) == 1:
-                            lemma_per_definition[int(identifier)].append(tokens[0])
 
                     if multi_word_lemmas or len(tokens) == 1:
                         for token in tokens:

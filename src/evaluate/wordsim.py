@@ -77,6 +77,8 @@ class WordSimEvaluation:
 
         for key, data in sorted(self.data.items(), key=operator.itemgetter(0)):
 
+            # print('%s t: %d n: %d' % (key, data.total_size, data.not_found))
+
             embedding_values = dict()
 
             for (w1, w2), value in data.manual_values.items():
@@ -164,7 +166,7 @@ class WordSimEvaluation:
             den1 += (val1 - avg1) ** 2
             den2 += (val2 - avg2) ** 2
 
-        return numr / math.sqrt(den1 * den2)
+        return numr / math.sqrt(den1 * den2) 
 
     @staticmethod
     def spearmans_rho(ranked_dict1, ranked_dict2):

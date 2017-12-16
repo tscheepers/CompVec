@@ -20,18 +20,23 @@ class Run:
                  run_group_name,
                  dataset,
                  embedding_processor,
+                 yc=True,
+                 pretraining=None,
                  learning_rate=1e-3,
                  batch_size=512,
                  embedding_size=300,
                  stop_gradients_y_n=False,
                  dropout_keep_p=0.75,
                  margin=0.25,
-                 pretraining=None,
                  composition='sum',
-                 refine_after_x_steps=0):
+                 loss='mse',
+                 refine_after_x_steps=0,
+                 no=None):
 
         self.dataset = dataset
         self.embedding_processor = embedding_processor
+        self.y_composition = yc
+        self.no = no
 
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -42,17 +47,25 @@ class Run:
         self.run_dir = directory('/out/run-%s' % run_group_name, ['logs', 'tsne', 'embeddings', 'output'])
         self.data_dir = embedding_processor.path
 
+        self.x_max_buckets = None
+
+        if hasattr(self.dataset, 'x_max_lengths'):
+            self.x_max_buckets = self.dataset.x_max_lengths
+
         self.graph = tf.Graph()
         with self.graph.as_default():
 
             # Model
             self.model = Model(
                 embedding_size=embedding_size,
+                x_max_buckets=self.x_max_buckets,
                 x_max_length=self.dataset.x_max_length,
                 y_max_length=self.dataset.y_max_length,
+                y_composition=self.y_composition,
                 vocab_size=self.dataset.vocab_size,
                 margin=margin,
                 composition=composition,
+                loss=loss,
                 stop_gradients_y_n=stop_gradients_y_n
             )
 
@@ -70,11 +83,12 @@ class Run:
         """
         Get the run name
         """
-        return '%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-my%d-em%d-r%d' % (
-            self.model.composition, ('random' if self.pretraining is None else self.pretraining),
+        return '%s-%s%s-%s-d%.2f-m%.2f-sg%d-lr%.3f-bs%d-mx%d-my%d-em%d-r%d-yc%d-%s' % (
+            self.dataset.name, self.model.composition, ('' if self.no is None else '-%d' % self.no),
+            ('random' if self.pretraining is None else self.pretraining),
             self.dropout_keep_p, self.model.margin, int(self.model.stop_gradients_y_n),
             self.learning_rate, self.batch_size, self.dataset.x_max_length, self.dataset.y_max_length,
-            self.model.embedding_size, self.refine_after_x_steps
+            self.model.embedding_size, self.refine_after_x_steps, (1 if self.y_composition else 0), self.model.loss
         )
 
     # noinspection PyAttributeOutsideInit
@@ -84,21 +98,34 @@ class Run:
         """
 
         # Optimizer
-        self.loss_op, self.compose_op, self.compose_e_op, self.compose_y_op = self.model.fn()
-        self.optimize_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss_op)
+        if self.x_max_buckets is None:
+            self.loss_op, self.compose_op, self.compose_e_op, self.compose_y_op = self.model.fn()
+            self.optimize_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss_op)
+        else:
+            self.loss_op, self.compose_op, self.compose_e_op, self.compose_y_op = self.model.fn()
+            self.optimize_ops = dict()
+            self.loss_ops = dict()
+            self.summary_loss_ops = dict()
+
+            for bucket in self.x_max_buckets:
+                loss_op, _, _, _ = self.model.fn(reuse=True, bucket=bucket)
+                self.loss_ops[bucket] = loss_op
+                self.summary_loss_ops[bucket] = tf.summary.merge(self.model.bucketed_summaries[bucket])
+                with tf.variable_scope("optimizer", reuse=(bucket != self.x_max_buckets[0])):
+                    self.optimize_ops[bucket] = tf.train.AdamOptimizer(self.learning_rate).minimize(loss_op)
 
         # Add variable initializer
         self.init_op = tf.global_variables_initializer()
 
         # Summary
-        self.nn_op = self.evaluation.nn.tf_op()
+        self.compveceval_op = self.evaluation.compveceval.tf_op()
         self.senteval_op = self.evaluation.senteval.tf_op()
         self.wordsim_op = self.evaluation.wordsim.tf_op()
 
         self.summary_loss_op = tf.summary.merge(self.model.summaries)
         self.summary_loss_evaluation_op = tf.summary.merge(
             self.model.summaries +
-            self.evaluation.nn.summaries +
+            self.evaluation.compveceval.summaries +
             self.evaluation.wordsim.summaries +
             self.evaluation.senteval.summaries
         )
@@ -107,7 +134,7 @@ class Run:
         self.saver = tf.train.Saver()
 
     # noinspection PyAttributeOutsideInit
-    def setup_writers(self):
+    def setup_writers(self, add_embedding_visualization=True):
         """
         Setup the writers for Tensorboard Logging, also setup embedding visualization in Tensorboard
         """
@@ -119,11 +146,12 @@ class Run:
                                                  self.graph)
 
         # For visualizing the embeddings in TensorBoard
-        config = projector.ProjectorConfig()
-        embedding = config.embeddings.add()
-        embedding.tensor_name = self.model.embeddings.name
-        embedding.metadata_path = '%s/vocab.tsv' % (self.data_dir,)
-        projector.visualize_embeddings(self.test_writer, config)
+        if add_embedding_visualization:
+            config = projector.ProjectorConfig()
+            embedding = config.embeddings.add()
+            embedding.tensor_name = self.model.embeddings.name
+            embedding.metadata_path = '%s/vocab.tsv' % (self.data_dir,)
+            projector.visualize_embeddings(self.test_writer, config)
 
     def initialize_model(self):
         """
@@ -149,7 +177,7 @@ class Run:
             print('Pre-trained embeddings from %s loaded' % self.pretraining)
 
     # noinspection PyAttributeOutsideInit
-    def execute(self, steps=100000):
+    def execute(self, steps=20000, rank_every_x_steps=2500):
         """
         Run the model
         """
@@ -162,8 +190,11 @@ class Run:
         self.out_lines = list()
         self.store_attr = defaultdict(dict)
 
+        # Only allocate a fraction of the GPU, since there needs to be enough room for SentEval PyTorch
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+
         # Start Tensorflow Session
-        self.session = tf.Session(graph=self.graph)
+        self.session = tf.Session(graph=self.graph, config=tf.ConfigProto(gpu_options=gpu_options))
         with self.session.as_default():
 
             # Initialize the model
@@ -171,29 +202,29 @@ class Run:
 
             for step in range(steps + 1):
                 self.step = step
-                if not self.execute_step(): break
+                if not self.execute_step(rank_every_x_steps=rank_every_x_steps): break
 
-    def execute_step(self):
+    def execute_step(self, rank_every_x_steps=2500):
         """
         Run one of the model
         """
 
         test_result = True  # If test is not executed, all is alright
-        if self.every_x_steps(x=2500):
-            test_result = self.test_step(rank_every_x_steps=25000)
+        if self.every_x_steps(x=500):
+            test_result = self.test_step(rank_every_x_steps=rank_every_x_steps)
 
         # Note that this is expensive (~20% slowdown if computed every 1000 steps)
         # if self.every_x_steps(x=2500):
         #     self.out(self.evaluation.log_similarity())
 
-        if self.every_x_steps(x=100000, include_first_step=False):
+        if self.every_x_steps(x=self.steps, include_first_step=False):
             path = self.evaluation.plot_with_labels(filename='%s/tsne/%s-%d.pdf' % (self.run_dir, self.name, self.step))
             self.out("tSNE plot of step %d saved in file: %s" % (self.step, path))
 
-        if self.every_x_steps(x=100000, include_first_step=False):
+        if self.every_x_steps(x=self.steps, include_first_step=False):
             self.save_model()
 
-        train_result = self.train_step(out_every_x_steps=500)
+        train_result = self.train_step(out_every_x_steps=100)
 
         if len(self.out_attr) + len(self.out_lines) > 0:
             self.print_out()
@@ -210,7 +241,7 @@ class Run:
 
         return (self.step != 0 and self.step % x == 0) or self.step == self.steps
 
-    def test_step(self, rank_every_x_steps=25000):
+    def test_step(self, rank_every_x_steps=2500):
         """
         Test the model using the entire test set, additionally also execute a ranking test
         """
@@ -220,10 +251,10 @@ class Run:
 
         if self.every_x_steps(x=rank_every_x_steps):
 
-            # Run our self-designed NN evaluation metric
+            # Run our self-designed CompVecEval evaluation metric
             t0 = time.time()
-            nn_r = self.evaluation.nn.evaluate(self.session, self.compose_op, self.compose_y_op)
-            feed_dict = self.evaluation.nn.feed_dict(nn_r, feed_dict=feed_dict)
+            compveceval_r = self.evaluation.compveceval.evaluate(self.session, self.compose_op, self.compose_y_op)
+            feed_dict = self.evaluation.compveceval.feed_dict(compveceval_r, feed_dict=feed_dict)
 
             # Run word similarity evaluation for metrics as fromwordvectors.org
             t1 = time.time()
@@ -232,15 +263,18 @@ class Run:
 
             # Run evaluation from SentEval to get sentence metrics
             t2 = time.time()
-            senteval_r = self.evaluation.senteval.evaluate(self.session, self.compose_e_op, pretrain=self.pretraining)
-            feed_dict = self.evaluation.senteval.feed_dict(senteval_r, feed_dict=feed_dict)
+            thorough_eval = self.step == self.steps or (self.step == 0 and self.model.composition in ['sum', 'avg', 'prod', 'max'])
+            senteval_tf_r, senteval_r = self.evaluation.senteval.evaluate(self.session, self.compose_e_op, pretrain=self.pretraining, thorough=thorough_eval)
+            feed_dict = self.evaluation.senteval.feed_dict(senteval_tf_r, feed_dict=feed_dict)
 
             t3 = time.time()
             loss, _, summary = self.session.run([
-                self.loss_op, self.nn_op, self.summary_loss_evaluation_op
+                self.loss_op,
+                self.compveceval_op,
+                self.summary_loss_evaluation_op
             ], feed_dict=feed_dict)
 
-            for k, v in nn_r.items():
+            for k, v in compveceval_r.items():
                 if k == 'MNR':
                     self.out(k, v, format='%.3f')
                 else:
@@ -252,7 +286,7 @@ class Run:
             for k, v in senteval_r.items():
                 self.out(k, v, format='%.3f')
 
-            self.out('NN Time', (t1 - t0), format='%.2fs')
+            self.out('CompVecEval Time', (t1 - t0), format='%.2fs')
             self.out('WordSim Time', (t2 - t1), format='%.2fs')
             self.out('SentEval Time', (t3 - t2), format='%.2fs')
 
@@ -271,28 +305,35 @@ class Run:
         return True
 
     # noinspection PyAttributeOutsideInit
-    def train_step(self, out_every_x_steps=500, summary_every_x_steps=100):
+    def train_step(self, out_every_x_steps=100, summary_every_x_steps=100):
         """
         Train the model using a batch of training data
         """
 
         # Train step
-        x, y_p, y_n = self.dataset.train.next_batch(self.batch_size)
+        if self.x_max_buckets is None:
+            bucket = None
+            x, y_p, y_n = self.dataset.train.next_batch(self.batch_size)
+            optimize_op, loss_op, summary_loss_ops = self.optimize_op, self.loss_op, self.summary_loss_op
+        else:
+            x, y_p, y_n, bucket = self.dataset.train.next_batch(self.batch_size)
+            optimize_op, loss_op, summary_loss_ops = self.optimize_ops[bucket], self.loss_ops[bucket], self.summary_loss_ops[bucket]
 
         feed_dict = self.model.feed_dict(
             x, y_p, y_n,
             dropout_keep_p=self.dropout_keep_p,
-            stop_embedding_gradients=(self.model.composition in ['rnn', 'gru'] and self.step < self.refine_after_x_steps)
+            stop_embedding_gradients=(self.model.composition not in ['sum', 'avg', 'prod', 'max'] and self.step < self.refine_after_x_steps),
+            bucket=bucket
         )
 
         # Only execute summary for train every 10 steps to speed up training
         if self.every_x_steps(summary_every_x_steps):
             _, loss, summary = self.session.run([
-                self.optimize_op, self.loss_op, self.summary_loss_op
+                optimize_op, loss_op, summary_loss_ops
             ], feed_dict=feed_dict)
             self.train_writer.add_summary(summary, self.step)
         else:
-            loss, summary = self.session.run([self.loss_op, self.summary_loss_op], feed_dict=feed_dict)
+            _, loss = self.session.run([optimize_op, loss_op], feed_dict=feed_dict)
 
         if math.isnan(loss):
             self.out('Train loss is NaN, stopped training and stop run')
@@ -310,30 +351,31 @@ class Run:
 
         return True
 
-    def save_model(self):
+    def save_model(self, save_embeddings=True, save_tensorflow_model=True, save_out=True):
         """
         Save the Tensorflow model as well as the embedding data
         """
 
-        embeddings_matrix = self.model.embeddings.eval()
-        embeddings = dict()
+        if save_embeddings:
+            embeddings_matrix = self.model.embeddings.eval()
+            embeddings = dict()
 
-        for i in range(self.dataset.vocab_size):
-            embeddings[i] = embeddings_matrix[i, :]
+            for i in range(self.dataset.vocab_size):
+                embeddings[i] = embeddings_matrix[i, :]
 
-        save_path = self.embedding_processor.store_embeddings(embeddings,
-                                                              '%s/embeddings/%s-%d.vec.gz' % (
-                                                              self.run_dir, self.name, self.step))
-        self.out("Embedding vectors saved in file: %s" % save_path)
+            save_path = self.embedding_processor.store_embeddings(embeddings, '%s/embeddings/%s-%d.vec.gz' % (self.run_dir, self.name, self.step))
+            self.out("Embedding vectors saved in file: %s" % save_path)
 
         # Save the variables to disk.
-        save_path = self.saver.save(self.session, '%s/logs/%s/test/%d.ckpt' % (self.run_dir, self.name, self.step))
-        self.out("Model saved in file: %s" % save_path)
+        if save_tensorflow_model:
+            save_path = self.saver.save(self.session, '%s/logs/%s/test/%d.ckpt' % (self.run_dir, self.name, self.step))
+            self.out("Model saved in file: %s" % save_path)
 
         # Save the training out to disk
-        save_path = '%s/output/%s-%d.pkl' % (self.run_dir, self.name, self.step)
-        pickle.dump(self.store_attr, open(save_path, 'w+b'), protocol=4)
-        self.out("Training output saved in file: %s" % save_path)
+        if save_out:
+            save_path = '%s/output/%s-%d.pkl' % (self.run_dir, self.name, self.step)
+            pickle.dump(self.store_attr, open(save_path, 'w+b'), protocol=4)
+            self.out("Training output saved in file: %s" % save_path)
 
     def out(self, key, value=None, format='%.4f'):
         """
@@ -359,7 +401,19 @@ class Run:
             self.name, self.step, self.steps, self.dataset.train.epochs_completed, elapsed_time
         ), end=' ')
 
-        print(', '.join(['%s: %s' % (key, value) for key, value in self.out_attr.items()]), end='\n')
+        out_attr = []
+
+        for key, value in self.out_attr.items():
+
+            if key.endswith('/n') or key.endswith('/pearson/p') or key.endswith('/spearman/r') or key.endswith('/spearman/p'):
+                continue
+
+            if key.endswith('/pearson/r'):
+                key = key.replace('/pearson/r', '')
+
+            out_attr.append('%s: %s' % (key, value))
+
+        print(', '.join(out_attr), end='\n')
 
         for value in self.out_lines:
             print(value)

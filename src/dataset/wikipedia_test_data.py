@@ -30,14 +30,18 @@ class WikipediaTestData:
         with open(path) as f:
 
             for line in f:
+
                 s = line.split(SEPERATOR)
-                if len(s) == 2:
-                    l, d = s
+                if len(s) != 2:
+                    continue
 
-                    d = tuple([(dataset.vocabulary[t] if t in dataset.vocabulary else UNK_SYMBOL) for t in d.split()])
-                    l = tuple([(dataset.vocabulary[t] if t in dataset.vocabulary else UNK_SYMBOL) for t in l.split()])
+                l, d = s
 
-                    self.keys.append((d, l))
+                d = tuple([(dataset.vocabulary[t] if t in dataset.vocabulary else UNK_SYMBOL) for t in d.split()])
+                l = tuple([(dataset.vocabulary[t] if t in dataset.vocabulary else UNK_SYMBOL) for t in l.split()])
+
+                if len(d) >= 1 and len(l) >= 1:
+                    self.keys.append((l, d))
 
         self.vocab_size = dataset.vocab_size
         self.num_examples = len(self.keys)
