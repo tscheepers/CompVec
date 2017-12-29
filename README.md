@@ -25,7 +25,7 @@ In our analysis, we evaluate original as well as tuned embeddings using existing
 Results
 ----
 
-Pretrained embeddings that are tuned for additive-comopsition (sum) can be downloaded at:
+Pretrained embeddings that are tuned for additive comopsition (sum) can be downloaded at:
 
 - `fasttext_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/fasttext_tuned.vec.gz)
 - `glove_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/glove_tuned.vec.gz)
