@@ -43,10 +43,12 @@ Research Publications
 Please cite the following thesis if you use our data or code for your own research:
 
 ```
-@inproceedings{scheepers2017lexicographic,
+@inproceedings{scheepers2018lexicographic,
   author    = {Scheepers, Thijs and Kanoulas, Evangelos and Gavves, Efstratios},
   title     = {Improving Word Embedding Compositionality using Lexicographic Definitions},
-  year      = {2017},
+  booktitle = {Proceedings of the 27th International Conference on World Wide Web},
+  series    = {WWW '18},
+  year      = {2018},
   location  = {Lyon, France},
   publisher = {International World Wide Web Conferences Steering Committee},
   address   = {Republic and Canton of Geneva, Switzerland}
