@@ -22,28 +22,6 @@ In our analysis, we evaluate original as well as tuned embeddings using existing
 - [SentEval](src/evaluate/senteval.py), sentence evaluation against various tasks and dataset.
 - [WordSim](src/evaluate/wordsim.py), word vector evaluation against various word similairty dataset.
 
-Papers
----
-
-- **Improving Word Embedding Compositionality using Lexicographic Definitions** _(will be published and presented at [WWW '18](https://www2018.thewebconf.org/))_
-- **Improving the Compositionality of Word Embeddings** [Thesis PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf), [Presentation PDF](https://thijs.ai/papers/scheepers-msc-thesis-presentation.pdf)
-- **Analyzing the compositional properties of word embeddings** [Paper PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
-
-Please cite the following paper, if you use this code for your own research:
-
-```
-@inproceedings{scheepers2018compositionality,
- author = {Scheepers, Thijs and Kanoulas, Evangelos and Gavves, Efstratios},
- title = {Improving Word Embedding Compositionality using Lexicographic Definitions},
- booktitle = {Proceedings of the 27th International Conference on World Wide Web},
- series = {WWW '18},
- year = {2018},
- location = {Lyon, France},
- publisher = {International World Wide Web Conferences Steering Committee},
- address = {Republic and Canton of Geneva, Switzerland},
-} 
-```
-
 Results
 ----
 
@@ -54,6 +32,26 @@ Tuned pretrained embeddings can be downloaded at:
 - `paragram_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/paragram_tuned.vec.gz)
 - `word2vec_tuned.vec` [Download](http://blob.thijs.ai/compvec/compvec_wordnet_multi/word2vec_tuned.vec.gz)
 
+
+Research Publications
+---
+
+- **Improving Word Embedding Compositionality using Lexicographic Definitions** _(will be published and presented at [WWW '18](https://www2018.thewebconf.org/))_
+- **Improving the Compositionality of Word Embeddings** [Thesis PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf), [Presentation PDF](https://thijs.ai/papers/scheepers-msc-thesis-presentation.pdf)
+- **Analyzing the compositional properties of word embeddings** [Paper PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
+
+Please cite the following thesis if you use this code for your own research:
+
+```
+@mastersthesis{scheepers2017compositionality,
+  author  = {Scheepers, Thijs}, 
+  title   = {Improving the Compositionality of Word Embeddings},
+  school  = {Universiteit van Amsterdam},
+  year    = {2017},
+  month   = {11},
+  address = {Science Park 904, Amsterdam, Netherlands}
+}
+```
 
 License (MIT)
 -----
