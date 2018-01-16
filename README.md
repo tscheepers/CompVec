@@ -1,4 +1,4 @@
-# CompVec: word embeddings for better compositionality
+# CompVec: Improving Word Embedding Compositionality using Lexicographic Definitions
 
 This repository contains all code that was used to write the paper: "CompVec: word embeddings for better compositionality". In the paper we present both an in-depth analysis of various word embeddings (Word2Vec, GloVe and fastText) in terms of their compositionality as well as a method to tune them towards better compositionality. We find that training the embeddings to compose improves the performance of these word embeddings overall.
 
@@ -36,7 +36,7 @@ Pretrained embeddings that are tuned for additive comopsition (sum) can be downl
 Research Publications
 ---
 
-- **Improving Word Embedding Compositionality using Lexicographic Definitions** _(will be published and presented at [WWW '18](https://www2018.thewebconf.org/))_
+- **Improving Word Embedding Compositionality using Lexicographic Definitions** _(will be published and presented at [WWW '18](https://www2018.thewebconf.org/program/web-content-analysis/))_
 - **Improving the Compositionality of Word Embeddings** [Thesis PDF](https://thijs.ai/papers/scheepers-msc-thesis-2017-improving-compositionality-word-embeddings.pdf), [Presentation PDF](https://thijs.ai/papers/scheepers-msc-thesis-presentation.pdf)
 - **Analyzing the compositional properties of word embeddings** [Paper PDF](https://thijs.ai/papers/scheepers-gavves-kanoulas-analyzing-compositional-properties.pdf)
 
